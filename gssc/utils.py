@@ -1,7 +1,6 @@
 import mne
 import numpy as np
 from itertools import combinations, product
-import pandas as pd
 import re
 import torch
 from torch.nn import Softmax, NLLLoss
