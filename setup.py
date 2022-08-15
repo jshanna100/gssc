@@ -22,7 +22,7 @@ if __name__ == "__main__":
                       "detection of sleep stages in polysomnographies.",
           license="GNU Affero General Public License",
           url="https://github.com/jshanna100/gssc",
-          version='0.0.1',
+          version='0.0.2',
           classifiers=["Intended Audience :: Science/Research",
                        "License :: OSI Approved",
                        "Programming Language :: Python :: 3",
