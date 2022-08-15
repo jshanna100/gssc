@@ -130,7 +130,7 @@ and reduce the number further if you still run out of memory.
 With CUDA, the GSSC will finish very quickly under most conditions, but if you
 are using the CPU, each combination can take up a lot of time. Therefore it is
 recommended that you only use one or two EEG channels and only one EOG channel,
-also using the --no_drop parameters (see channels and combinations) above.
+also using the --no_drop parameters (see channels and combinations above).
 Whether you use CUDA or CPU, there is not likely to be any noticeable accuracy
 benefit from using more than 3-4 EEG channels, as long as those channels are
 the preferred ones used the most during training of the GSSC: C3, C4, F3,
