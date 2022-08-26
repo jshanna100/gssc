@@ -1,7 +1,7 @@
 Greifswald Sleep Stage Classifier
 =================================
 
-Version 0.0.2
+Version 0.0.3
 
 ## What is this?
 
@@ -49,6 +49,10 @@ or:
     pip3 install gssc
 
 ## Use
+
+### GUI
+
+Coming soon!
 
 ### Command line
 
