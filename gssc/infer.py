@@ -1,6 +1,5 @@
 import mne
-import gssc.networks as networks
-from gssc.utils import (epo_arr_zscore, permute_sigs, check_flip_chan,
+from .utils import (epo_arr_zscore, permute_sigs, check_flip_chan,
                    loudest_vote, prepare_inst)
 import torch
 import numpy as np

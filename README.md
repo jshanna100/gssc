@@ -142,11 +142,30 @@ and F4.
 
 ## Real-time inference
 
-Coming soon!
+Inference can be performed on raw arrays of numbers, instead of MNE files,
+see the ArrayInfer class in infer.py. More detailed documentation is coming
+soon.
 
 ## Training
 
-Coming soon!
+If you wish to train networks using your own data, this has two main steps.
+We assume anyone doing this will already mostly know what they are doing, and
+is proficient with Python as well as PyTorch, so documentation here is limited.
+There are however examples available, and code is commented.
+
+### Prepare PyTorch DataSets.
+
+The fundamental building block of data management for the GSSC is the
+PSGDataSet class. An instance of this class organises a given set of PSGs from
+a dataset with uniform recording properties, and rapidly serves them up to the
+classifer during training. In most cases however, you will want to train
+multiple datasets in random order. For this, there is a SeqDataSet class
+which contains multiple PSGDataSets. See the Examples folder in this repo
+for examples of how to create these.
+
+### Train
+Once you have a SeqDataSet instance prepared and saved, you can train on these
+data using train.py. See the python script itself for usage instructions.
 
 ## License
 

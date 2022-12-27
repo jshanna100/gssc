@@ -1,11 +1,21 @@
 import mne
 import numpy as np
 from itertools import combinations, product
+import pandas as pd
 import re
 import torch
 from torch.nn import Softmax, NLLLoss
-#from sklearn.metrics import matthews_corrcoef, cohen_kappa_score, f1_score
 
+# flatten tensor, but leave batch dimension intact
+def _batch_flat(x):
+    return x.flatten(start_dim=1).unsqueeze(1)
+
+def param_combos(param_dict):
+    combos = list(product(*param_dict.values()))
+    comb_dict_list = []
+    for comb in combos:
+        comb_dict_list.append({k:v for k,v in zip(param_dict.keys(), comb)})
+    return comb_dict_list
 
 def make_blueprint(start_feat_exp, end_feat_exp, feat_steps, bn_factor, depth):
     f = [int(np.round(2**x)) for x in np.linspace(start_feat_exp,
@@ -145,10 +155,11 @@ def permute_sigs(temp_inst, signals, all_upper=False):
         all_chans.extend(chans)
         if sig_name == "eeg":
             eeg_chans = chans.copy()
+        if sig_dict["chans"] == "eeg_mix":
+            chans = ["eeg_mix"]
         if "flip" in sig_dict.keys() and sig_dict["flip"] == True:
             chans.extend(["FLIP_"+c for c in chans])
-        perms = [0, 1] if sig_dict["drop"] else [1]
-        for perm_n in perms:
+        for perm_n in sig_dict["perms"]:
             this_combo.extend(combinations(chans, perm_n))
         sig_combs[sig_name] = this_combo
     del temp_inst
@@ -188,6 +199,7 @@ def fn_aprx(feat_num, stepsize=16, max=512):
     return feat_out
 
 def score_infs(true, pred):
+    from sklearn.metrics import matthews_corrcoef, cohen_kappa_score, f1_score
     mc = matthews_corrcoef(true, pred)
     ck = cohen_kappa_score(true, pred)
     f1 = f1_score(true, pred, average=None)
@@ -210,6 +222,19 @@ def loudest_vote(logits):
     out_infs  = np.array(np.argmax(min_logits, axis=1))
     return out_infs
 
+def consensus(infs, certs, class_n=5, span=0.2):
+    cons_infs = []
+    infs = infs[:, np.newaxis] if len(infs.shape) == 1 else infs
+    certs = certs[:, np.newaxis] if len(certs.shape) == 1 else certs
+    votes = np.zeros((class_n, infs.shape[1]))
+    for idx, (inf, cert) in enumerate(zip(infs.T, certs.T)):
+        cmin, cmax = cert.min(), cert.max()
+        cert_reg = (1 - (cert - cmin) / (cmax - cmin)) * span + (1 - span)
+        for i, c in zip(inf, cert_reg):
+            votes[i, idx] += c
+    opt_infs = np.argmax(votes, axis=0)
+    return opt_infs
+
 def prepare_inst(inst, sig_len, cut):
     sfreq = sig_len / 30.
     if isinstance(inst, mne.io.base.BaseRaw):
@@ -227,15 +252,9 @@ def prepare_inst(inst, sig_len, cut):
         epo = mne.Epochs(raw, events, tmin=0, tmax=30, picks=raw.ch_names,
                          baseline=None)
     elif isinstance(inst, mne.epochs.BaseEpochs):
-        if epo.times[-1] != 30.:
-            raise ValueError("Epoch lengths must be exactly 30 seconds. "
-                             f"Length of these epochs is {epo.times[-1]}.")
         epo = inst.copy()
-        overshoot = 0
 
     epo.load_data()
     epo.resample(sfreq)
 
-    start_time = 0 if cut == "back" else overshoot
-
-    return epo, start_time
+    return epo
