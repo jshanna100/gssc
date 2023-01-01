@@ -159,7 +159,8 @@ def permute_sigs(temp_inst, signals, all_upper=False):
             chans = ["eeg_mix"]
         if "flip" in sig_dict.keys() and sig_dict["flip"] == True:
             chans.extend(["FLIP_"+c for c in chans])
-        for perm_n in sig_dict["perms"]:
+        perms = [0, 1] if sig_dict["drop"] else [1]
+        for perm_n in perms:
             this_combo.extend(combinations(chans, perm_n))
         sig_combs[sig_name] = this_combo
     del temp_inst
@@ -251,10 +252,12 @@ def prepare_inst(inst, sig_len, cut):
         events = mne.make_fixed_length_events(raw, duration=30.)
         epo = mne.Epochs(raw, events, tmin=0, tmax=30, picks=raw.ch_names,
                          baseline=None)
+        start_time = inst.times[events[0, 0]]
     elif isinstance(inst, mne.epochs.BaseEpochs):
         epo = inst.copy()
+        start_time = 0
 
     epo.load_data()
     epo.resample(sfreq)
 
-    return epo
+    return epo, start_time
