@@ -1,11 +1,7 @@
 Greifswald Sleep Stage Classifier
 =================================
 
-<<<<<<< HEAD
 Version 0.0.6
-=======
-Version 0.0.5
->>>>>>> 75008bb748de70d796da9ccc399fc25873fb94f9
 
 ## What is this?
 
