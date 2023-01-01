@@ -1,7 +1,7 @@
 Greifswald Sleep Stage Classifier
 =================================
 
-Version 0.0.3
+Version 0.0.5
 
 ## What is this?
 
