@@ -252,7 +252,7 @@ def prepare_inst(inst, sig_len, cut):
         events = mne.make_fixed_length_events(raw, duration=30.)
         epo = mne.Epochs(raw, events, tmin=0, tmax=30, picks=raw.ch_names,
                          baseline=None)
-        start_time = inst.times[events[0, 0]]
+        start_time = inst.times[events[0, 0] - raw.first_samp]
     elif isinstance(inst, mne.epochs.BaseEpochs):
         epo = inst.copy()
         start_time = 0
