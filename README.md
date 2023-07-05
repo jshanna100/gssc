@@ -22,7 +22,7 @@ for better management of environments for different projects.
 In the case that you use Anaconda for Python, you should create an environment
 for gssc. Input the following in the Anaconda terminal:
 
-    conda create --name gssc
+    conda create --name gssc python=3.9
 
 Before moving on with the installation, be sure to activate the environment:
 
