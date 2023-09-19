@@ -41,7 +41,7 @@ There are three main ways to interface the GSSC. You can use the GUI, the comman
 
 ### GUI
 
-The GUI can be opened from the command line simply by typing "gssc_gui" Documentation for the GUI can be found [here.]("gui_doc/gui_doc.md")
+The GUI can be opened from the command line simply by typing "gssc_gui" Documentation for the GUI can be found [here.](gui_doc/gui_doc.md)
 
 ### Command line
 
