@@ -22,7 +22,7 @@ if __name__ == "__main__":
                       "detection of sleep stages in polysomnographies.",
           license="GNU Affero General Public License",
           url="https://github.com/jshanna100/gssc",
-          version='0.0.6',
+          version='0.0.9',
           classifiers=["Intended Audience :: Science/Research",
                        "License :: OSI Approved",
                        "Programming Language :: Python :: 3",
@@ -30,10 +30,13 @@ if __name__ == "__main__":
                        "Operating System :: Unix",
                        "Operating System :: Microsoft :: Windows",
                        "Operating System :: MacOS"],
-          install_requires=['mne', 'torch', 'importlib-resources'],
+          install_requires=['mne', 'torch', 'importlib-resources', 'pandas'],
           packages=package_tree("gssc"),
           package_data={"gssc": [op.join("nets", "*.pt")]},
           entry_points={
-            "console_scripts":["gssc_infer = gssc.command.com_infer:main"]
+            "console_scripts":[
+                               "gssc_infer = gssc.command.com_infer:main",
+                               "gssc_gui = gssc.command.gui:main"
+                               ]
           }
     )

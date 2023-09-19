@@ -5,6 +5,12 @@ import pandas as pd
 import re
 import torch
 from torch.nn import Softmax, NLLLoss
+import csv
+from os.path import join
+import matplotlib.pyplot as plt
+from matplotlib.patches import Rectangle
+import matplotlib
+from datetime import timedelta
 
 # flatten tensor, but leave batch dimension intact
 def _batch_flat(x):
@@ -261,3 +267,98 @@ def prepare_inst(inst, sig_len, cut):
     epo.resample(sfreq)
 
     return epo, start_time
+
+def inst_load(filename):
+    ## detect type of input and load as MNE instance
+    # raw MNE
+    if filename[-8:] == "-raw.fif":
+        inst = mne.io.Raw(filename, preload=True)
+    # epoched MNE
+    elif filename[-8:] == "-epo.fif":
+        inst = mne.Epochs(filename, preload=True)
+    # edf
+    elif filename[-4:] == ".edf":
+        inst = mne.io.read_raw_edf(filename, preload=True)
+    # brainvision
+    elif filename[-5:] == ".vhdr":
+        inst = mne.io.read_raw_brainvision(filename, preload=True)
+    # eeglab
+    elif filename[-4:] == ".set":
+        inst = mne.io.read_raw_edf(filename, preload=True)
+    else:
+        raise ValueError("Format of input does not appear to be recognised. "
+                         "Try manually converting to MNE-Python format first.")
+    return inst
+
+def output_stages(stages, times, out_form, out_dir, fileroot):
+    if out_form == "csv":
+        with open(f"{join(out_dir, fileroot)}.csv", "wt") as csvfile:
+            csv_writer = csv.writer(csvfile)
+            csv_writer.writerow([f"Hypnogram of {fileroot}"])
+            csv_writer.writerow(["Epoch", "Time", "Stage"])
+            for epo_idx, time, stage in zip(np.arange(len(stages)), times, stages):
+                csv_writer.writerow([epo_idx, time, stage])
+    elif out_form == "mne":
+        annot = mne.Annotations(times, 30., stages.astype("str"))
+        annot.save(f"{join(out_dir, fileroot)}-annot.fif")
+
+
+def graph_summary(stages, times, inst, eegs,outdir, fileroot):
+    matplotlib.rc("font", weight="bold")
+    stage_col = {0:"blue", 1:"orange", 2:"green", 3:"purple", 4:"cyan"}
+    stage_names = {0:"Wake", 1:"N1", 2:"N2", 3:"N3", 4:"REM"}
+    stage_proportions = {s:0 for s in stage_names.keys()}
+
+    annot = mne.Annotations(times, 30., stages.astype("str"))
+    mos_str = '''
+                    AAAAAAAAAACCCC
+                    AAAAAAAAAACCCC
+                    AAAAAAAAAACCCC
+                    BBBBBBBBBBCCCC
+                    '''
+    fig, axes = plt.subplot_mosaic(mos_str, figsize=(19.2, 8.))
+    if len(eegs):
+        inst.set_annotations(annot)
+        events = mne.events_from_annotations(inst)
+        epo = mne.Epochs(inst, events[0], event_id=events[1], tmin=0., tmax=30.,
+                            baseline=None, preload=True)
+        n_fft = int(np.round(epo.info["sfreq"] * 4))
+        psd = epo.compute_psd(fmax=30., method="welch", n_fft=4096,
+                              picks=eegs)
+        psd_dat = np.log10(np.squeeze(psd.get_data().mean(axis=1)) * 1e12)
+        
+        axes["A"].imshow(psd_dat.T, aspect="auto", vmin=-1, vmax=3., cmap="jet")
+        yticks = np.arange(0, len(psd.freqs), 30)
+        axes["A"].set_yticks(yticks)
+        axes["A"].set_yticklabels([f"{psd.freqs[y]:.1f}" for y in yticks])
+        axes["A"].invert_yaxis()
+        axes["A"].set_ylabel("Hz", weight="bold")
+        axes["A"].set_xticks([])
+    else:
+        axes["A"].axis("off")
+
+    stages = [int(x["description"]) for idx, x in enumerate(annot)]
+    axes["B"].set_xlim(0, len(stages))
+    bar_w = 1
+    for idx, stage in enumerate(stages):
+        print(idx*bar_w)
+        axes["B"].add_patch(Rectangle((idx, 0), bar_w, 1, color=stage_col[stage]))
+    axes["B"].set_xlabel("Time", weight="bold")
+    # figure out the xticks, convert to hh:mm format
+    xticks = np.arange(0, len(stages), 60) # xticks every 30m
+    xticklabels = [str(timedelta(seconds=int(xt*30)))[:-3] for xt in xticks]
+    axes["B"].set_xticks(xticks, labels=xticklabels)
+    axes["B"].set_yticks([])
+
+    unqs, counts = np.unique(stages, return_counts=True)
+    proportions = counts / len(stages)
+    for unq, proportion in zip(unqs, proportions):
+        stage_proportions[unq] = proportion
+    axes["C"].bar(list(stage_names.values()), list(stage_proportions.values()), 
+                  color=list(stage_col.values()))
+    axes["C"].set_title("Proportions", weight="bold")
+
+    plt.suptitle(fileroot, weight="bold")
+    plt.tight_layout()
+    plt.savefig(join(outdir, f"{fileroot}.png"))
+    plt.close("all")

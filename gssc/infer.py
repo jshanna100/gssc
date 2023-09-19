@@ -9,6 +9,12 @@ from importlib_resources import files
 class ArrayInfer():
     def __init__(self, net, con_net, sig_combs, perm_matrix, all_chans,
                  sig_len=2560):
+        if net is None:
+            net_name = files('gssc.nets').joinpath("sig_net_v1.pt")
+            net = torch.load(net_name)
+        if con_net is None:
+            con_net_name = files('gssc.nets').joinpath("gru_net_v1.pt")
+            con_net = torch.load(con_net_name)
         self.sig_combs = sig_combs
         self.perm_matrix = perm_matrix
         self.perm_inds = np.arange(len(perm_matrix))
@@ -62,9 +68,32 @@ class ArrayInfer():
 
 
 class EEGInfer():
+    """Class for sleep stage inference on a set of EEG data.
+
+    Parameters
+    ----------
+    net : PyTorch Module (default None)
+        Neural network which processes the signals. If None defaults to built-in nets.
+    con_net : PyTorch Module (default None)
+        Neural network which takes context into account and infers the sleep stage.
+        If None defaults to built-in nets.
+    sig_len : int (default 2560)
+        Length of signal in samples.
+    cut : str (default 'back')
+        Either 'back' or 'front'. When the signal is cut into epochs of 2560 samples,
+        any remaining time is cut, either from the front or back.
+    use_cuda : bool (default True)
+        Use CUDA acceleration for inference.
+    chunk_n : int (default 0)
+        Limit inference to chunk_n epochs at a time - useful in the case of CUDA memory
+        constraints. When set at 0 (default), the whole file is done in one step.
+    gpu_idx : int or None (default)
+        In the case of multiple GPUs on a single system, select with an integer which
+        GPU to use.
+
+    """
     def __init__(self, net=None, con_net=None, sig_len=2560, cut="back",
-                 use_cuda=True, perms="all", chunk_n=0,
-                 gpu_idx=None):
+                 use_cuda=True, chunk_n=0, gpu_idx=None):
         if net is None:
             net_name = files('gssc.nets').joinpath("sig_net_v1.pt")
             net = torch.load(net_name)
@@ -96,14 +125,40 @@ class EEGInfer():
                           "instead of CUDA is significantly slower!")
             self.use_cuda = False
         else:
-            print("Running without CUDA on CPU. Performance will be suboptimal.")
+            print("Running without CUDA on CPU. Speed will be suboptimal.")
             self.use_cuda = False
         # make sure they're in evaluation mode for inference
         self.net.eval()
         self.con_net.eval()
 
     def mne_infer(self, inst, chunk_n=0, eeg="eeg", eog="eog", eeg_drop=True,
-                  eog_drop=True):
+                  eog_drop=True, filter=True):
+        """
+        Performs inference on a EEG recording.
+
+        Parameters
+        ----------
+        inst : MNE-Python Raw or Epochs instance.
+            The EEG instance to be inferred, in MNE Python format.
+        chunk_n : int (default 0)
+            Limit inference to chunk_n epochs at a time - useful in the case of CUDA memory
+            constraints. When set at 0 (default), the whole file is done in one step. 
+            Overrides self.chunk_n
+        eeg : "eeg" or List of str (default 'eeg')
+            EEG channels to use for inference. If 'eeg' then all available EEG channels are
+            used (generally not recommended).
+        eog : "eog" or List of str (default 'eog')
+            EOG channels to use for inference. If 'eog' then all available EOG channels are
+            used (generally not recommended).
+        eeg_drop : bool (default True)
+            Allow null permutations for EEG
+        eog_drop : bool (default True)
+            Allow null permutations for EOG
+        filter : bool (default True)
+            Filter the data to a bandpass of 0.3-30Hz, where possible, if this has not
+            already been done.
+        """
+        
         net = self.net
         con_net = self.con_net
         sig_len = self.sig_len
@@ -112,11 +167,18 @@ class EEGInfer():
         use_cuda = self.use_cuda
 
         # check for filtering
+        if filter:
+            filter_band = [None, None]
+            if round(inst.info["highpass"], 2) < 0.3:
+                filter_band[0] = 0.3
+            if round(inst.info["lowpass"], 2) > 30.:
+                filter_band[1] = 30.
+            inst.filter(*filter_band)
         if round(inst.info["highpass"], 2) != 0.3:
             warnings.warn("WARNING: GSSC was trained on data with a highpass "
                          "filter of 0.3Hz. These data have a highpass filter "
                          f"of {inst.info['highpass']}Hz")
-        if round(inst.info["lowpass"], 2) != 30:
+        if round(inst.info["lowpass"], 2) != 30.:
             warnings.warn("WARNING: GSSC was trained on data with a lowpass "
                          "filter of 30Hz. These data have a lowpass filter "
                          f"of {inst.info['lowpass']}Hz")

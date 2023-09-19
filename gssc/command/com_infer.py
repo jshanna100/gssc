@@ -2,8 +2,8 @@ import argparse
 import mne
 import numpy as np
 from os import path
-import csv
 from ..infer import EEGInfer
+from ..utils import inst_load, output_stages, pick_chan_names, graph_summary
 
 def main():
 
@@ -20,30 +20,11 @@ def main():
     parser.add_argument("--drop_eog", default=True)
     parser.add_argument("--no_drop_eeg", dest="drop_eeg", action="store_false")
     parser.add_argument("--no_drop_eog", dest="drop_eog", action="store_false")
+    parser.add_argument("--no_filter", dest="filter", action="store_false")
+    parser.add_argument("--graph", dest="graph", action="store_true")
     opt = vars(parser.parse_args())
 
-
-    ## detect type of input and load as MNE instance
-    # raw MNE
-    filepath, filename = path.split(opt["file"])
-    fileroot, fileext = path.splitext(filename)
-    if filename[-8:] == "-raw.fif":
-        inst = mne.io.Raw(opt["file"])
-    # epoched MNE
-    elif filename[-8:] == "-epo.fif":
-        inst = mne.Epochs(opt["file"])
-    # edf
-    elif filename[-4:] == ".edf":
-        inst = mne.io.read_raw_edf(opt["file"])
-    # brainvision
-    elif filename[-5:] == ".vhdr":
-        inst = mne.io.read_raw_brainvision(opt["file"])
-    # eeglab
-    elif filename[-4:] == ".set":
-        inst = mne.io.read_raw_edf(opt["file"])
-    else:
-        raise ValueError("Format of input does not appear to be recognised. "
-                         "Try manually converting to MNE-Python format first.")
+    inst = inst_load(opt["file"])
 
     eeginfer = EEGInfer(cut=opt["cut_from"], use_cuda=opt["use_cuda"],
                         chunk_n=opt["chunk_size"])
@@ -61,15 +42,14 @@ def main():
         eog = opt["eog"][1:]
     stages, times = eeginfer.mne_infer(inst, eeg=eeg, eog=eog,
                                        eeg_drop=opt["drop_eeg"],
-                                       eog_drop=opt["drop_eog"])
+                                       eog_drop=opt["drop_eog"],
+                                       filter=opt["filter"])
 
-    if opt["out_form"] == "csv":
-        with open(f"{path.join(filepath, fileroot)}.csv", "wt") as csvfile:
-            csv_writer = csv.writer(csvfile)
-            csv_writer.writerow([f"Hypnogram of {filename}"])
-            csv_writer.writerow(["Epoch", "Time", "Stage"])
-            for epo_idx, time, stage in zip(np.arange(len(stages)), times, stages):
-                csv_writer.writerow([epo_idx, time, stage])
-    elif opt["out_form"] == "mne":
-        annot = mne.Annotations(times, 30., stages.astype("str"))
-        annot.save(f"{path.join(filepath, fileroot)}-annot.fif")
+    filepath, filename = path.split(opt["file"])
+    fileroot, fileext = path.splitext(filename)
+    output_stages(stages, times, opt["out_form"], filepath, fileroot)
+    
+    if opt["graph"]:
+        eegs = pick_chan_names(inst, "eeg") if isinstance(eeg, str) else eeg
+        graph_summary(stages, times, inst, eegs, filepath, fileroot)
+
