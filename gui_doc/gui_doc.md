@@ -19,12 +19,19 @@ From the populated channel list in the central section, we select the EEG and/or
 In the bottom right corner, we can specify parameters for inference.
 
 **Use CUDA:** Make use of CUDA acceleration. This will be auto-selected if your computer is capable of it. If not, it will be disabled by default.
+
 **Filter:** Filters the data with a bandpass 0.3-30Hz, which is the band the GSSC was trained on. Do not uncheck unless you are certain your data are already filtered to this band.
+
 **Chunk size:** This is useful if your CUDA-capable GPU does not have enough memory to do a whole file at once. If you get out-of-memory errors, try setting this to 500, or less if you still get errors.
+
 **Allow Null Permutation:** The GSSC will try different permutations of EEG/EOG channels from the set of channels you selected previously. A null EEG permutation is one where no EEG channel is used at all (i.e. EOG only), or the reverse with null EOG. If you deselect these, these null permutations will not be allowed.
+
 **Output directory:** Optional. Output will go in the specified directory. If unspecified, the results will go in the same directory as the EEG files.
+
 **Output format:** Mandatory. Options are MNE-Python annotation files, or comma-delimited text files (.csv)
+
 **Graphic summary:** If selected, this will produce a graphic summary of the results for each file. These are saved as .png files wherever the output goes.
+
 **Score:** This actually runs the inference. Give it some time, especially if you have a lot of files in the left window, or do not have CUDA acceleration. Note: when you click this button inference will run on **every** file in the left window, not just the one you clicked for electrode selection.
 
 ## Failed staging
