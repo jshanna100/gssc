@@ -5,14 +5,12 @@ Version 0.0.9
 
 ## What is this?
 
-The Greifswald Sleep Stage Classifier (GSSC) is an automatic sleep stage classifer that takes an EEG or Polysomnography (PSG) recording as input and outputs a hypnogram. It is deep learning based, and therefore runs best on a CUDA-capable GPU, i.e. with an NVIDIA graphics card, preferably not
-more than five years old. It will also run without a CUDA GPU, though significantly slower.
+The Greifswald Sleep Stage Classifier (GSSC) is an automatic sleep stage classifer that takes an EEG or Polysomnography (PSG) recording as input and outputs a hypnogram. It is deep learning based, and therefore runs best on a CUDA-capable GPU, i.e. with an NVIDIA graphics card, preferably not more than five years old. It will also run without a CUDA GPU, though significantly slower.
 
 ## Installation
 
 ### 1. Install Python
-The GSSC runs within Python, so you will need to have that installed on your computer in one form or another. We recommend [Anaconda Distribution](https://www.anaconda.com/products/distribution)
-for better management of environments for different projects. In the case that you use Anaconda for Python, you should create an environment for gssc. Input the following in the Anaconda terminal:
+The GSSC runs within Python, so you will need to have that installed on your computer in one form or another. We recommend [Anaconda Distribution](https://www.anaconda.com/products/distribution) for better management of environments for different projects. In the case that you use Anaconda for Python, you should create an environment for gssc. Input the following in the Anaconda terminal:
 
     conda create --name gssc python=3.9
 
@@ -20,10 +18,10 @@ Before moving on with the installation, be sure to activate the environment:
 
     conda activate gssc
 
-Also activate the environment anytime you wish to use gssc in the future.
+Also, **activate the environment** anytime you wish to install, upgrade or use the GSSC in the future.
 
 ### 2. Install PyTorch
-The GSSC uses PyTorch for deep learning implementation. All of the software the GSSC needs to run will be installed automatically along with the GSSC, but because the appropriate PyTorch version varies depending on operating system, Python version, CUDA availability, etc. it is recommended that you install it yourself by going to the front page of [PyTorch]("https://pytorch.org") and
+The GSSC uses PyTorch for deep learning implementation. All of the software the GSSC needs to run will be installed automatically along with the GSSC, including PyTorch, so in theory this step could be skipped. Nevertheless, because the appropriate PyTorch version varies depending on operating system, Python version, CUDA availability, etc. it is recommended that you install it yourself by going to the front page of [PyTorch]("https://pytorch.org") and
 following the instructions for your particular system.
 
 ### 3. Install GSCC
@@ -34,6 +32,10 @@ If you have sucessfully completed the first two steps, you can now install the G
 or:
 
     pip3 install gssc
+
+If you are upgrading from a previous version, use the -U parameter:
+
+    pip install -U gssc
 
 ## Use
 
@@ -52,13 +54,13 @@ The GSSC can be used from the command line with gssc_infer, and by specifying th
 Internally, the GSSC works with EEG data in MNE Python -raw.fif or -epo.fif format, and it is recommended that you convert your data to that format first. Nevertheless, gssc_infer will also accept files in .edf, .vhdr (Brainvision), or .set (EEGLAB) format and attempt to convert them. In the case that you input epoched data, make sure that all epochs are exactly 30 seconds long. Note that in the case where you do not explicitly specify channels, the GSSC will use
 the EEG/EOG identifications that it finds. There is no guarantee that these are correct, especially when you convert from another format, so either convert to MNE by hand and make sure the channel IDs are correct, or specify the channels to use with parameters (see "channels and combinations" below).
 
-The GSSC was trained on data that were bandpass filtered at 0.3-30Hz, and we strongly recommend you also filter your data the same way for inference.
+The GSSC was trained on data that were bandpass filtered at 0.3-30Hz. Filtering will by default be performed automatically before inference, where necessary. This can be turned off with the --no_filter parameter, but this is not recommended unless you have a very good reason and know what you are doing.
 
 ### Channels and combinations
 
-By default, the GSSC will perform a separate inference for each possible combination of EEG and EOG channels, and, for each 30s period, will use the inference which is most likely to be correct. These combinations include the possibility of using no EEG or no EOG channel. For example, if there are two EEG channels (C3 and C4), and one EOG channel (HEOG), this results in 5 combinations: C3 and HEOG, C4 and HEOG, C3 alone, C4 alone, and HEOG alone. With more channels, it is easy to see that the number of combinations can quickly become very high. It is sensible then to limit the number of channels used for inference. Apart from this, **the GSSC was mostly trained on the EEG channels C3, C4, F3, F4, and using other channels is unlikely to improve accuracy, and could even make accuracy worse.**
+By default, the GSSC will perform a separate inference for each possible combination of EEG and EOG channels, and, for each 30s period, will use the inference which is most likely to be correct. These combinations include the possibility of using no EEG or no EOG channel. For example, if there are two EEG channels (C3 and C4), and one EOG channel (HEOG), this results in 5 combinations: C3 and HEOG, C4 and HEOG, C3 alone, C4 alone, and HEOG alone. With more channels, it is easy to see that the number of combinations can quickly become very high. It is sensible then to limit the number of channels used for inference. Apart from this, **the GSSC was mostly trained on the EEG channels C3, C4, F3, F4, and using other channels is unlikely to improve accuracy, and could even make accuracy worse.** For EOG, the GSSC was trained on the HEOG channel (left EOG - right EOG, and reverse), and seems to also perform well with left and/or right EOG alone, i.e. without the subtraction. **Effectiveness of using VEOG is unknown and not recommended.**
 
-You can do this manually by removing all the irrelevant channels from the file yourself, or by specifying the channels to GSSC. At the command line this is accomplished with the use of the --eeg and --eog parameters. For example:
+You can specify manually which channels the GSSC should use. At the command line this is accomplished with the use of the --eeg and --eog parameters. For example:
 
     gssc_infer myeegfile-raw.fif --eeg C3 --eeg C4 --eog "EOG L"
 
@@ -100,6 +102,9 @@ The fundamental building block of data management for the GSSC is the PSGDataSet
 
 ### Train
 Once you have a SeqDataSet instance prepared and saved, you can train on these data using train.py. See the python script itself for usage instructions.
+
+## Support
+If you have problems using the GSSC, you can communicate them at the Issues tab on this repository. Please appreciate that maintaining this is not my primary responsibility, and is done as a voluntary service to the scientific and medical community. As such, answers to queries may not necesarily come immediately. I also cannot offer any assistance for problems installing or using Python, Anaconda, CUDA, or PyTorch. 
 
 ## License
 
