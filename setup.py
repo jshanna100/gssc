@@ -30,7 +30,7 @@ if __name__ == "__main__":
                        "Operating System :: Unix",
                        "Operating System :: Microsoft :: Windows",
                        "Operating System :: MacOS"],
-          install_requires=['mne', 'torch', 'importlib-resources', 'pandas'],
+          install_requires=['mne', 'torch', 'importlib-resources', 'pandas', 'matplotlib'],
           packages=package_tree("gssc"),
           package_data={"gssc": [op.join("nets", "*.pt")]},
           entry_points={

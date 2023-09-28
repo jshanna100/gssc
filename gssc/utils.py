@@ -303,7 +303,7 @@ def output_stages(stages, times, out_form, out_dir, fileroot):
         annot.save(f"{join(out_dir, fileroot)}-annot.fif")
 
 
-def graph_summary(stages, times, inst, eegs,outdir, fileroot):
+def graph_summary(stages, times, inst, eegs, outdir, fileroot):
     matplotlib.rc("font", weight="bold")
     stage_col = {0:"blue", 1:"orange", 2:"green", 3:"purple", 4:"cyan"}
     stage_names = {0:"Wake", 1:"N1", 2:"N2", 3:"N3", 4:"REM"}
@@ -341,7 +341,6 @@ def graph_summary(stages, times, inst, eegs,outdir, fileroot):
     axes["B"].set_xlim(0, len(stages))
     bar_w = 1
     for idx, stage in enumerate(stages):
-        print(idx*bar_w)
         axes["B"].add_patch(Rectangle((idx, 0), bar_w, 1, color=stage_col[stage]))
     axes["B"].set_xlabel("Time", weight="bold")
     # figure out the xticks, convert to hh:mm format

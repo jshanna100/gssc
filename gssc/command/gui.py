@@ -121,10 +121,12 @@ def score():
             fileroot, fileext = splitext(filename)
             outdir = filepath if outdirVar.get() == "" else outdirVar.get()
             output_stages(stages, times, outform, outdir, fileroot)
+            print("Sleep stages written.")
             if graphVar:
+                print("Producing graphic summary...")
                 graph_summary(stages, times, inst, eegs, outdir, fileroot)
-        except:
-            print(f"\nError: could not infer {file}.\n")
+        except Exception as e:
+            print(f"\nError: could not infer {file}.\n{e}")
             filelist.itemconfig(idx, foreground="red")
             continue
         filelist.itemconfig(idx, foreground="blue")
