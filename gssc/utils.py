@@ -4,7 +4,8 @@ from itertools import combinations, product
 import pandas as pd
 import re
 import torch
-from torch.nn import Softmax, NLLLoss
+from torch.nn import NLLLoss
+from torch.nn import functional as F
 import csv
 from os.path import join
 import matplotlib.pyplot as plt
@@ -215,7 +216,7 @@ def score_infs(true, pred):
 
     return mc, ck, f1, f1_macro, acc
 
-def loudest_vote(logits):
+def loudest_vote(logits, return_probs=False):
     loss_func = NLLLoss(reduction="none")
     logits = torch.FloatTensor(np.array(logits))
     entrs = torch.FloatTensor(logits.shape[:2])
@@ -227,7 +228,11 @@ def loudest_vote(logits):
     min_inds = np.argmin(entrs, axis=0)
     min_logits = logits[min_inds, np.arange(logits.shape[1])]
     out_infs  = np.array(np.argmax(min_logits, axis=1))
-    return out_infs
+    if return_probs:
+        min_probs = F.softmax(min_logits, dim=-1).numpy()
+        return out_infs, min_probs
+    else:
+        return out_infs
 
 def consensus(infs, certs, class_n=5, span=0.2):
     cons_infs = []
@@ -290,14 +295,19 @@ def inst_load(filename):
                          "Try manually converting to MNE-Python format first.")
     return inst
 
-def output_stages(stages, times, out_form, out_dir, fileroot):
+def output_stages(stages, times, probs, out_form, out_dir, fileroot):
     if out_form == "csv":
         with open(f"{join(out_dir, fileroot)}.csv", "wt") as csvfile:
             csv_writer = csv.writer(csvfile)
             csv_writer.writerow([f"Hypnogram of {fileroot}"])
-            csv_writer.writerow(["Epoch", "Time", "Stage"])
-            for epo_idx, time, stage in zip(np.arange(len(stages)), times, stages):
-                csv_writer.writerow([epo_idx, time, stage])
+            csv_writer.writerow(["Epoch", "Time", "Stage", 
+                                 "Prob. W", "Prob. N1", "Prob. N2",
+                                 "Prob. N3", "Prob. REM"])
+            for epo_idx, time, stage, prob in zip(np.arange(len(stages)), 
+                                                  times, 
+                                                  stages,
+                                                  probs):
+                csv_writer.writerow([epo_idx, time, stage, *prob])
     elif out_form == "mne":
         annot = mne.Annotations(times, 30., stages.astype("str"))
         annot.save(f"{join(out_dir, fileroot)}-annot.fif")

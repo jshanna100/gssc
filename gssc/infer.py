@@ -7,6 +7,35 @@ import warnings
 from importlib_resources import files
 
 class ArrayInfer():
+    """Class for sleep stage inference on a set of EEG data.
+
+    Parameters
+    ----------
+    net : PyTorch Module (default None)
+        Neural network which processes the signals. If None defaults to built-in nets.
+    con_net : PyTorch Module (default None)
+        Neural network which takes context into account and infers the sleep stage.
+        If None defaults to built-in nets.
+    sig_combs : dict
+        Dictionary containing lists as values for keys "eeg" and "eog". each
+        list is a list of all possible eeg and eog channels to use,
+        respectively. This can also be automatically produced from a template
+        MNE-Python instance with gssc.utils.permute_sigs
+    perm_matrix : nX2 numpy array
+        Numpy array where each row is a possible combination of signals, the
+        first column contains the channel indices for EEG channels and the
+        second column contains the indices for the EOG channels. This can also 
+        be automatically produced from an MNE-Python template instance with 
+        gssc.utils.permute_sigs
+    all_chans : list
+        list of all channels in the same order as they are in the data array.
+        This can also be automatically produced from an MNE-Python template 
+        instance with gssc.utils.permute_sigs
+
+
+    sig_len : int (default 2560)
+        Length of signal in samples.
+    """
     def __init__(self, net, con_net, sig_combs, perm_matrix, all_chans,
                  sig_len=2560):
         if net is None:
@@ -157,6 +186,15 @@ class EEGInfer():
         filter : bool (default True)
             Filter the data to a bandpass of 0.3-30Hz, where possible, if this has not
             already been done.
+
+        Returns
+        --------
+        out_infs : numpy int array
+            Sleep stages for each epoch, integer-coded as follows: 
+            0:Wake, 1:N1, 2:N2, 3:N3, 4:REM
+        times : numpy int array
+            Time in seconds when sleep stages begin
+        logits : 
         """
         
         net = self.net
@@ -194,9 +232,6 @@ class EEGInfer():
 
         all_sigs = {}
         logits = []
-        infs = []
-        res_logits = []
-        res_infs = []
 
         for perm_idx in range(len(perm_matrix)):
             these_chans = {"eeg":None, "eog":None}
@@ -251,12 +286,12 @@ class EEGInfer():
 
                 del reps
 
-                inf = torch.argmax(y, dim=-1)
                 y = y.float()
                 logits.append(y[:,0,].cpu().numpy())
+        logits = np.array(logits)
 
-        # calculate consensus
-        out_infs = loudest_vote(np.array(logits))
+        # calculate consensus 
+        out_infs, probs = loudest_vote(logits, return_probs=True)
 
         times = np.arange(start_time, len(out_infs)*30, 30)
-        return out_infs, times
+        return out_infs, times, probs

@@ -113,14 +113,14 @@ def score():
             continue # already succesfully done at an earlier pass
         try:
             inst = inst_load(file)
-            stages, times = eeginfer.mne_infer(inst, eeg=eegs, eog=eogs, 
-                                               eeg_drop=eeg_dropVar.get(), 
-                                               eog_drop=eog_dropVar.get(),
-                                               filter=filterVar.get())
+            stages, times, probs = eeginfer.mne_infer(inst, eeg=eegs, eog=eogs, 
+                                                    eeg_drop=eeg_dropVar.get(), 
+                                                    eog_drop=eog_dropVar.get(),
+                                                    filter=filterVar.get())
             filepath, filename = split(file)
             fileroot, fileext = splitext(filename)
             outdir = filepath if outdirVar.get() == "" else outdirVar.get()
-            output_stages(stages, times, outform, outdir, fileroot)
+            output_stages(stages, times, probs, outform, outdir, fileroot)
             print("Sleep stages written.")
             if graphVar:
                 print("Producing graphic summary...")

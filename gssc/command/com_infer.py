@@ -40,14 +40,14 @@ def main():
         eog = []
     else:
         eog = opt["eog"][1:]
-    stages, times = eeginfer.mne_infer(inst, eeg=eeg, eog=eog,
-                                       eeg_drop=opt["drop_eeg"],
-                                       eog_drop=opt["drop_eog"],
-                                       filter=opt["filter"])
+    stages, times, probs = eeginfer.mne_infer(inst, eeg=eeg, eog=eog,
+                                               eeg_drop=opt["drop_eeg"],
+                                               eog_drop=opt["drop_eog"],
+                                               filter=opt["filter"])
 
     filepath, filename = path.split(opt["file"])
     fileroot, fileext = path.splitext(filename)
-    output_stages(stages, times, opt["out_form"], filepath, fileroot)
+    output_stages(stages, times, probs, opt["out_form"], filepath, fileroot)
     
     if opt["graph"]:
         eegs = pick_chan_names(inst, "eeg") if isinstance(eeg, str) else eeg
