@@ -6,7 +6,7 @@ from torch.utils.data import DataLoader, SubsetRandomSampler, Subset
 from torch.nn import NLLLoss
 from torch.optim import AdamW
 from torch.nn.init import kaiming_normal_, constant_
-from gssc.utils import calc_accuracy, make_blueprint
+from gssc.utils import make_blueprint
 import argparse
 import datetime
 import time

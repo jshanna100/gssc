@@ -16,84 +16,81 @@ class ArrayInfer():
     con_net : PyTorch Module (default None)
         Neural network which takes context into account and infers the sleep stage.
         If None defaults to built-in nets.
-    sig_combs : dict
-        Dictionary containing lists as values for keys "eeg" and "eog". each
-        list is a list of all possible eeg and eog channels to use,
-        respectively. This can also be automatically produced from a template
-        MNE-Python instance with gssc.utils.permute_sigs
-    perm_matrix : nX2 numpy array
-        Numpy array where each row is a possible combination of signals, the
-        first column contains the channel indices for EEG channels and the
-        second column contains the indices for the EOG channels. This can also 
-        be automatically produced from an MNE-Python template instance with 
-        gssc.utils.permute_sigs
-    all_chans : list
-        list of all channels in the same order as they are in the data array.
-        This can also be automatically produced from an MNE-Python template 
-        instance with gssc.utils.permute_sigs
-
-
-    sig_len : int (default 2560)
-        Length of signal in samples.
+    use_cuda : bool
+        Use CUDA acceleration
+    gpu_idx : int
+        Index of which GPU to use. Defaults to None (the first GPU).
     """
-    def __init__(self, net, con_net, sig_combs, perm_matrix, all_chans,
-                 sig_len=2560):
+    def __init__(self, net=None, con_net=None, use_cuda=False, gpu_idx=None):
         if net is None:
             net_name = files('gssc.nets').joinpath("sig_net_v1.pt")
             net = torch.load(net_name)
         if con_net is None:
             con_net_name = files('gssc.nets').joinpath("gru_net_v1.pt")
             con_net = torch.load(con_net_name)
-        self.sig_combs = sig_combs
-        self.perm_matrix = perm_matrix
-        self.perm_inds = np.arange(len(perm_matrix))
-        self.all_chans = all_chans
         self.net = net
         self.con_net = con_net
-        self.sig_len = sig_len
+        self.use_cuda = use_cuda
+        if use_cuda:
+            self.net.cuda(device=gpu_idx)
+            self.con_net.cuda(device=gpu_idx)
+        self.net.eval()
+        self.con_net.eval()
 
-    def infer(self, arr, hiddens, perm_inds=None):
-        sig_combs = self.sig_combs
-        perm_matrix = self.perm_matrix
-        all_chans = self.all_chans
-        net = self.net
-        con_net = self.con_net
-        perm_inds = perm_inds if perm_inds else self.perm_inds
+    @torch.no_grad()
+    def infer(self, sigs, hidden=None):
+        """
+        Performs inference on a single EEG and/or EOG channel(s)
 
-        all_sigs = {}
-        logits = []
-        res_logits = []
-        for perm_idx in perm_inds:
-            these_chans = {"eeg":None, "eog":None}
-            perm = perm_matrix[perm_idx,]
-            sigs = {}
-            for sig_idx, (sig_name, chans) in enumerate(sig_combs.items()):
-                # build the data array for each signal, convert to tensor
-                if not len(chans[perm[sig_idx]]):
-                    continue
-                chan = chans[perm[sig_idx]][0]
-                ch, coef = check_flip_chan(chan)
-                all_chans_idx = all_chans.index(ch)
-                signal = coef * arr[:, all_chans_idx, :self.sig_len]
-                signal = signal.reshape(-1, 1, signal.shape[-1])
-                sigs[sig_name] = signal
-                these_chans[sig_name] = chan
-            perm_str = "eeg: {}, eog: {}".format(*these_chans.values())
-            all_sigs[perm_str] = sigs
+        Parameters
+        ----------
+        sigs : dictionary
+            The keys to this dictionary should match the keys of the signal
+            processing networks - on the built-in networks these are "eeg" 
+            and "eog". It is allowed to omit keys, so long as at least one
+            is specified. The values the dictionary should be the actual
+            signals, as PyTorch torch.float32 tensors. The dimensionality
+            of the tensor should be E*1*T where E is the number of epochs
+            and T is the number of samples. For the built-in networks, the
+            number of samples must be 2560, and these samples must represent
+            a time period of 30s, i.e. a sampling rate of 85.33333 Hz.
+        hidden : Pytorch float32 tensor
+            These represent the hidden state, or "context" of the GRU network.
+            For the built-in networks, this tensor should have a shape of
+            (10, 1, 256). If not specified, a tensor of zeros will be
+            initialised.
+            
+        Returns
+        --------
+        logits : Pytorch float32 tensor
+            These are the logits, which indicate the probability that the
+            classifier assigns to each sleep stage. For each 1x5 row, the 
+            column with the highest number indicates the sleep stage, e.g. if
+            column 0 has the highest logit, then the classifier infers Wake.
+            Columns 0,1,2,3,4 indicate Wake, N1, N2, N3, and REM respectively.
+            These can be converted into probabilities by e.g. using the 
+            torch.nn.functional softmax function on the final dimension. 
+            Tensors have shape of E * 5 with the built-in networks, where E is
+            the number of epochs.
+        nocontext_logits : Pytorch float32 tensor
+            These are exactly the same as the logits, but are inferred without
+            taking surrounding context into consideration
+        hidden : Pytorch float32 tensor
+            This tensor (10, 1, 256) encodes the context. When doing inference
+            sequentially, feed this into the next inference call.
 
-        with torch.no_grad():
-            for sig_idx, (sig_k, sigs) in enumerate(all_sigs.items()):
-                reps, dec = net(sigs, rep_output=True)
-                reps = reps.swapaxes(-1, 1)
-                y, hidden = con_net(reps, hiddens[sig_idx,])
-                hiddens[sig_idx,] = hidden
-                del reps
-
-                logits.append(y[:,0,].cpu().numpy())
-                dec = dec[...,0]
-                res_logits.append(dec.cpu().numpy())
-
-        return np.array(logits), np.array(res_logits), hiddens
+        """
+        if hidden is None:
+            hidden = torch.zeros(10, 1, 256)
+        if self.use_cuda:
+            for k in sigs.keys():
+                sigs[k] = sigs[k].to("cuda")
+            hidden = hidden.to("cuda")
+        reps, nocontext_logits = self.net(sigs, rep_output=True)
+        reps = reps.swapaxes(-1, 1)
+        logits, hidden = self.con_net(reps, hidden)
+        del reps
+        return logits[:,0,], nocontext_logits[...,0], hidden
 
 
 class EEGInfer():
@@ -119,7 +116,6 @@ class EEGInfer():
     gpu_idx : int or None (default)
         In the case of multiple GPUs on a single system, select with an integer which
         GPU to use.
-
     """
     def __init__(self, net=None, con_net=None, sig_len=2560, cut="back",
                  use_cuda=True, chunk_n=0, gpu_idx=None):
@@ -194,7 +190,8 @@ class EEGInfer():
             0:Wake, 1:N1, 2:N2, 3:N3, 4:REM
         times : numpy int array
             Time in seconds when sleep stages begin
-        logits : 
+        probs : numpy float array
+            Inference as a hypnodensity
         """
         
         net = self.net
@@ -232,7 +229,6 @@ class EEGInfer():
 
         all_sigs = {}
         logits = []
-
         for perm_idx in range(len(perm_matrix)):
             these_chans = {"eeg":None, "eog":None}
             perm = perm_matrix[perm_idx,]
@@ -250,7 +246,7 @@ class EEGInfer():
             perm_str = "eeg: {}, eog: {}".format(*these_chans.values())
             all_sigs[perm_str] = sigs
 
-        for sig_idx, (sig_k, sigs) in enumerate(all_sigs.items()):
+        for sig_idx, sigs in enumerate(all_sigs.values()):
             print(f"Inferring permutation {sig_idx+1} of {len(all_sigs)}")
             for k in sigs.keys():
                 sigs[k] = sigs[k].reshape(-1, 1, sigs[k].shape[-1])
@@ -261,7 +257,7 @@ class EEGInfer():
                         sigs[k] = sigs[k].to("cuda")
                 # prepare chunk indices
                 hypno_len = len(sigs[k])
-                chunk_nn = hypno_len if not chunk_n else chunk_n
+                chunk_nn = hypno_len if not chunk_n else chunk_n                                                    
                 chunks = np.arange(0, hypno_len, chunk_nn)
                 chunks = np.append(chunks, hypno_len)
                 all_reps = []
@@ -270,7 +266,6 @@ class EEGInfer():
                     these_sigs = {}
                     for k in sigs.keys():
                         these_sigs[k] = sigs[k][chunks[c_idx]:chunks[c_idx+1],]
-
                     reps = net(these_sigs, rep_output="rep_only")
 
                     reps = reps.swapaxes(-1, 1)
@@ -288,8 +283,8 @@ class EEGInfer():
 
                 y = y.float()
                 logits.append(y[:,0,].cpu().numpy())
-        logits = np.array(logits)
 
+        logits = np.array(logits)
         # calculate consensus 
         out_infs, probs = loudest_vote(logits, return_probs=True)
 
