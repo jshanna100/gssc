@@ -218,16 +218,17 @@ def score_infs(true, pred):
 
 def loudest_vote(logits, return_probs=False):
     loss_func = NLLLoss(reduction="none")
-    logits = torch.FloatTensor(np.array(logits))
-    entrs = torch.FloatTensor(logits.shape[:2])
+    if not torch.is_tensor(logits):
+        logits = torch.FloatTensor(logits)
     # calculate entropy loss
-    for idx in range(len(logits)):
-        targs = torch.LongTensor(np.argmax(logits[idx], axis=-1))
-        entrs[idx] = loss_func(logits[idx], targs)
+    targs = torch.argmax(logits, dim=-1)
+    entrs = loss_func(logits.view((-1, logits.shape[-1])), targs.flatten())
+    entrs = entrs.view(targs.shape) # back into the right shape after batch
     # assemble logits of minimal entropy across the PSG
-    min_inds = np.argmin(entrs, axis=0)
+    min_inds = torch.argmin(entrs, dim=0)
     min_logits = logits[min_inds, np.arange(logits.shape[1])]
-    out_infs  = np.array(np.argmax(min_logits, axis=1))
+    out_infs  = np.array(torch.argmax(min_logits, dim=1).cpu())
+    # convert logits to probabilities if desired
     if return_probs:
         min_probs = F.softmax(min_logits, dim=-1).numpy()
         return out_infs, min_probs
