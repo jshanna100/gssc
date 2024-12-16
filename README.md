@@ -90,7 +90,32 @@ With CUDA, the GSSC will finish very quickly under most conditions, but if you a
 
 ## Real-time inference
 
-Inference can be performed on raw arrays of numbers, instead of MNE files, see the ArrayInfer class in infer.py. More detailed documentation is coming soon.
+If you want to do real-time inference (e.g. BCI) you can use the mne.infer.ArrayInfer class to do inference on raw arrays, in the form of Pytorch tensors.
+
+```
+from gssc.infer import ArrayInfer
+import torch
+
+array_infer = ArrayInfer(use_cuda=False)
+# generate some random numbers for input
+eeg, eog = torch.rand(50, 1, 2560), torch.rand(50, 1, 2560) # 50 epochs of 2560 time samples each
+# let's just do the first epoch for now
+sigs = {"eeg":eeg[0,][None,], "eog":eog[0,][None,]} # tensors must have 3 dimensions, so add [None,] 
+logits, _, hidden = array_infer.infer(sigs)
+```
+The inference is contained in the logits variable, an Ex5 tensor, where E is the number of epochs you input. The 5 columns represent the 5 possible sleep stages, in order W,N1,N2,N3,N4. The column with the lowest value is the most probable inferred sleep stage. They can also be converted to probabilities with the softmax function:
+```
+import torch.nn.functional as F
+probs = F.softmax(logits,dim=1)
+```
+With probabilities of course the column with the highest number is the most likely sleep stage.
+
+Shall we go forward and infer the next epoch?
+```
+sigs = {"eeg":eeg[1,][None,], "eog":eog[1,][None,]}
+logits, _, hidden = array_infer.infer(sigs, hidden=hidden)
+```
+Notice here unlike with the first epoch, we have specified the hidden state which was output by our inference on the first epoch. This variable encodes the context, and generally results in more accurate inference. Every further inference should make use of the hidden state of the previous epoch where possible.
 
 ## Training
 
