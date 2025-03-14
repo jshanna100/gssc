@@ -24,10 +24,10 @@ class ArrayInfer():
     def __init__(self, net=None, con_net=None, use_cuda=False, gpu_idx=None):
         if net is None:
             net_name = files('gssc.nets').joinpath("sig_net_v1.pt")
-            net = torch.load(net_name)
+            net = torch.load(net_name, weights_only=False)
         if con_net is None:
             con_net_name = files('gssc.nets').joinpath("gru_net_v1.pt")
-            con_net = torch.load(con_net_name)
+            con_net = torch.load(con_net_name, weights_only=False)
         self.net = net
         self.con_net = con_net
         self.use_cuda = use_cuda
@@ -121,10 +121,10 @@ class EEGInfer():
                  use_cuda=True, chunk_n=0, gpu_idx=None):
         if net is None:
             net_name = files('gssc.nets').joinpath("sig_net_v1.pt")
-            net = torch.load(net_name)
+            net = torch.load(net_name, weights_only=False)
         if con_net is None:
             con_net_name = files('gssc.nets').joinpath("gru_net_v1.pt")
-            con_net = torch.load(con_net_name)
+            con_net = torch.load(con_net_name, weights_only=False)
         self.net = net
         self.con_net = con_net
         self.sig_len = sig_len
