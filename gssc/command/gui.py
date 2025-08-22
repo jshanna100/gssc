@@ -108,15 +108,17 @@ def score():
     files = filelist.get(0, filelist.size())
     eegs = list(eeglist.get(0, eeglist.size()))
     eogs = list(eoglist.get(0, eoglist.size()))
+    eeg_drop = eeg_dropVar.get() if len(eegs) else True
+    eog_drop = eog_dropVar.get() if len(eogs) else True
     for idx, file in enumerate(files):
         if filelist.itemcget(idx, "foreground") == "blue":
             continue # already succesfully done at an earlier pass
         try:
             inst = inst_load(file)
             stages, times, probs = eeginfer.mne_infer(inst, eeg=eegs, eog=eogs, 
-                                                    eeg_drop=eeg_dropVar.get(), 
-                                                    eog_drop=eog_dropVar.get(),
-                                                    filter=filterVar.get())
+                                                      eeg_drop=eeg_drop, 
+                                                      eog_drop=eog_drop,
+                                                      filter=filterVar.get())
             filepath, filename = split(file)
             fileroot, fileext = splitext(filename)
             outdir = filepath if outdirVar.get() == "" else outdirVar.get()
